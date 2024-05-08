@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+
+
+
+# 指定文件名
+file="sample2.tsv"
+
+# 使用awk来筛选和收集符合条件的数据
+awk -F'\t' '{
+    # 跳过没有Cantril得分的行
+    if ($8 != "") {
+        # 将数据存储到数组中
+        data[$2][length(data[$2]) + 1] = $6" "$8
+        count[$2]++
+    }
+}
+
+END {
+    # 遍历所有国家
+    for (country in count) {
+        # 只处理数据点大于等于3的国家
+        if (count[country] >= 3) {
+            # 遍历每一年的数据
+            for (pair in data[country]) {
+                split(data[country][pair], values, " ")
+                x = values[1]  # Homicide Rate
+                y = values[2]  # Cantril Score
+                sum_x += x
+                sum_y += y
+                sum_xy += x * y
+                sum_x2 += x * x
+                sum_y2 += y * y
+                n++
+            }
+        }
+    }
+
+    # 计算总体相关系数
+    numerator = n * sum_xy - sum_x * sum_y
+    denominator = sqrt((n * sum_x2 - sum_x^2) * (n * sum_y2 - sum_y^2))
+    if (denominator != 0) {
+        correlation = numerator / denominator
+        printf "Mean correlation of Homicide Rate with Cantril ladder across all qualifying countries is %.3f\n", correlation
+    } else {
+        print "Insufficient data or division by zero error"
+    }
+}' "$file"
