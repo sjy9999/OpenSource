@@ -1,48 +1,80 @@
 #!/usr/bin/env bash
 
+file="${1:-sample2.tsv}"  # 如果没有指定文件，则默认为 sample2.tsv
 
+awk -F'\t' '
+function abs(x) { return x < 0 ? -x : x; }  # 定义一个绝对值函数
 
+BEGIN {
+    # 初始化数据类型和对应的列号
+    types["Homicide Rate"] = 6;
+    types["GDP"] = 4;
+    types["Population"] = 5;
+    types["Life Expectancy"] = 7;
 
-# 指定文件名
-file="sample2.tsv"
+    # 定义输出顺序
+    order[1] = "Homicide Rate";
+    order[2] = "GDP";
+    order[3] = "Population";
+    order[4] = "Life Expectancy";
+}
 
-# 使用awk来筛选和收集符合条件的数据
-awk -F'\t' '{
-    # 跳过没有Cantril得分的行
+{
+    # 只考虑有Cantril得分的行
     if ($8 != "") {
-        # 将数据存储到数组中
-        data[$2][length(data[$2]) + 1] = $6" "$8
-        count[$2]++
+        country = $2;
+        cantrilEntries[country]++;
+        # 先不存储数据，只统计数量
+        tempData[country][cantrilEntries[country]] = $4 " " $5 " " $6 " " $7 " " $8;
     }
 }
 
 END {
-    # 遍历所有国家
-    for (country in count) {
-        # 只处理数据点大于等于3的国家
-        if (count[country] >= 3) {
-            # 遍历每一年的数据
-            for (pair in data[country]) {
-                split(data[country][pair], values, " ")
-                x = values[1]  # Homicide Rate
-                y = values[2]  # Cantril Score
-                sum_x += x
-                sum_y += y
-                sum_xy += x * y
-                sum_x2 += x * x
-                sum_y2 += y * y
-                n++
+    # 遍历每个国家，检查Cantril得分的数据点是否足够
+    for (country in cantrilEntries) {
+        if (cantrilEntries[country] >= 3) {
+            # 该国家的Cantril得分数据点足够，处理数据
+            for (i = 1; i <= cantrilEntries[country]; i++) {
+                split(tempData[country][i], values, " ");
+                for (t in types) {
+                    col = types[t];
+                    data[t][length(data[t]) + 1] = values[col-3] " " values[5];  # values[5] is Cantril
+                }
             }
         }
     }
 
-    # 计算总体相关系数
-    numerator = n * sum_xy - sum_x * sum_y
-    denominator = sqrt((n * sum_x2 - sum_x^2) * (n * sum_y2 - sum_y^2))
-    if (denominator != 0) {
-        correlation = numerator / denominator
-        printf "Mean correlation of Homicide Rate with Cantril ladder across all qualifying countries is %.3f\n", correlation
-    } else {
-        print "Insufficient data or division by zero error"
+    # 对每种类型的数据计算相关系数，并按照指定顺序输出
+    for (i = 1; i <= 4; i++) {
+        t = order[i];
+        sum_x = sum_y = sum_xy = sum_x2 = sum_y2 = n = 0;
+        for (j in data[t]) {
+            split(data[t][j], values, " ");
+            x = values[1];
+            y = values[2];
+            sum_x += x;
+            sum_y += y;
+            sum_xy += x * y;
+            sum_x2 += x * x;
+            sum_y2 += y * y;
+            n++;
+        }
+        numerator = n * sum_xy - sum_x * sum_y;
+        denominator = sqrt((n * sum_x2 - sum_x^2) * (n * sum_y2 - sum_y^2));
+        if (denominator != 0) {
+            correlation = numerator / denominator;
+            # 按指定顺序打印每种类型的相关系数
+            printf "Mean correlation of %s with Cantril Ladder across all qualifying data is %.3f\n", t, correlation;
+            # 检查是否为最大的相关系数
+            if (abs(correlation) > abs(max_corr)) {
+                max_corr = correlation;
+                max_type = t;
+            }
+        } else {
+            print "Insufficient data or division by zero error for " t;
+        }
     }
+
+    # 打印出最大的相关系数和对应的类型
+    printf "Most predictive mean correlation with the Cantril ladder is %s (r = %.3f)\n", max_type, max_corr;
 }' "$file"
