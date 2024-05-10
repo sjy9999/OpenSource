@@ -17,6 +17,7 @@ BEGIN {
     order[2] = "GDP";
     order[3] = "Population";
     order[4] = "Life Expectancy";
+    max_corr = 0;  # 初始化最大相关系数
 }
 
 {
@@ -24,7 +25,6 @@ BEGIN {
     if ($8 != "") {
         country = $2;
         cantrilEntries[country]++;
-        # 先不存储数据，只统计数量
         tempData[country][cantrilEntries[country]] = $4 " " $5 " " $6 " " $7 " " $8;
     }
 }
@@ -34,40 +34,39 @@ END {
     for (country in cantrilEntries) {
         if (cantrilEntries[country] >= 3) {
             # 该国家的Cantril得分数据点足够，处理数据
-            for (i = 1; i <= cantrilEntries[country]; i++) {
-                split(tempData[country][i], values, " ");
-                for (t in types) {
-                    col = types[t];
-                    data[t][length(data[t]) + 1] = values[col-3] " " values[5];  # values[5] is Cantril
+            for (t in types) {
+                sum_x = sum_y = sum_xy = sum_x2 = sum_y2 = n = 0;
+                for (i = 1; i <= cantrilEntries[country]; i++) {
+                    split(tempData[country][i], values, " ");
+                    x = values[types[t] - 3];
+                    y = values[5];  # Cantril值的索引，确保正确
+                    sum_x += x;
+                    sum_y += y;
+                    sum_xy += x * y;
+                    sum_x2 += x * x;
+                    sum_y2 += y * y;
+                    n++;
+                }
+                numerator = n * sum_xy - sum_x * sum_y;
+                denominator = sqrt((n * sum_x2 - sum_x^2) * (n * sum_y2 - sum_y^2));
+                if (denominator != 0) {
+                    correlation = numerator / denominator;
+                    corrSum[t] += correlation;
+                    corrCount[t]++;
                 }
             }
         }
     }
 
-    # 对每种类型的数据计算相关系数，并按照指定顺序输出
+    # 计算并打印每种类型的平均相关系数
     for (i = 1; i <= 4; i++) {
         t = order[i];
-        sum_x = sum_y = sum_xy = sum_x2 = sum_y2 = n = 0;
-        for (j in data[t]) {
-            split(data[t][j], values, " ");
-            x = values[1];
-            y = values[2];
-            sum_x += x;
-            sum_y += y;
-            sum_xy += x * y;
-            sum_x2 += x * x;
-            sum_y2 += y * y;
-            n++;
-        }
-        numerator = n * sum_xy - sum_x * sum_y;
-        denominator = sqrt((n * sum_x2 - sum_x^2) * (n * sum_y2 - sum_y^2));
-        if (denominator != 0) {
-            correlation = numerator / denominator;
-            # 按指定顺序打印每种类型的相关系数
-            printf "Mean correlation of %s with Cantril Ladder across all qualifying data is %.3f\n", t, correlation;
+        if (corrCount[t] > 0) {
+            avgCorr = corrSum[t] / corrCount[t];
+            printf "Mean correlation of %s with Cantril Ladder is %.3f\n", t, avgCorr;
             # 检查是否为最大的相关系数
-            if (abs(correlation) > abs(max_corr)) {
-                max_corr = correlation;
+            if (abs(avgCorr) > abs(max_corr)) {
+                max_corr = avgCorr;
                 max_type = t;
             }
         } else {
