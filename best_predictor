@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-file="${1:-sample2.tsv}"  # 如果没有指定文件，则默认为 sample2.tsv
+
+# file="${1:-sample2.tsv}"  # 如果没有指定文件，则默认为 sample2.tsv
+# file="${1:-enhanced_gdp_vs_happiness.tsv}"  # 如果没有指定文件，则默认为 sample2.tsv
 
 awk -F'\t' '
 function abs(x) { return x < 0 ? -x : x; }  # 定义一个绝对值函数
@@ -22,7 +24,7 @@ BEGIN {
 
 {
     # 只考虑有Cantril得分的行
-    if ($8 != "") {
+    if ($8 != "" && $4 != "" && $5 != "" && $6 != "" && $7 != "") {
         country = $2;
         cantrilEntries[country]++;
         tempData[country][cantrilEntries[country]] = $4 " " $5 " " $6 " " $7 " " $8;
@@ -40,19 +42,23 @@ END {
                     split(tempData[country][i], values, " ");
                     x = values[types[t] - 3];
                     y = values[5];  # Cantril值的索引，确保正确
-                    sum_x += x;
-                    sum_y += y;
-                    sum_xy += x * y;
-                    sum_x2 += x * x;
-                    sum_y2 += y * y;
-                    n++;
+                    if (x != "" && y != "") {  # 确保x和y非空
+                        sum_x += x;
+                        sum_y += y;
+                        sum_xy += x * y;
+                        sum_x2 += x * x;
+                        sum_y2 += y * y;
+                        n++;
+                    }
                 }
-                numerator = n * sum_xy - sum_x * sum_y;
-                denominator = sqrt((n * sum_x2 - sum_x^2) * (n * sum_y2 - sum_y^2));
-                if (denominator != 0) {
-                    correlation = numerator / denominator;
-                    corrSum[t] += correlation;
-                    corrCount[t]++;
+                if (n > 0) {
+                    numerator = n * sum_xy - sum_x * sum_y;
+                    denominator = sqrt((n * sum_x2 - sum_x^2) * (n * sum_y2 - sum_y^2));
+                    if (denominator != 0) {
+                        correlation = numerator / denominator;
+                        corrSum[t] += correlation;
+                        corrCount[t]++;
+                    }
                 }
             }
         }
@@ -76,4 +82,7 @@ END {
 
     # 打印出最大的相关系数和对应的类型
     printf "Most predictive mean correlation with the Cantril ladder is %s (r = %.3f)\n", max_type, max_corr;
-}' "$file"
+}'
+
+# }' "$file"
+# }'
