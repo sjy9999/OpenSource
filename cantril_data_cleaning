@@ -1,71 +1,105 @@
 #!/usr/bin/env bash
 
-# life_expectancy    2 3 4       Code	Year	Life expectancy
-# homicide_rate     2 3 4      Code	Year	Homicide rate
-# <Entity> <Code> <Year> <GDP per capita> <Population> <Homicide Rate> <Life Expectancy> <Cantril Ladder score>
+# 验证参数数量是否正确
 if [ $# -ne 3 ]; then
     echo "Usage: $0 gdp-vs-happiness.tsv life_expectancy.tsv homicide-rate-unodc.tsv"
     exit 1
 fi
 
-output_file="enhanced_gdp_vs_happiness.tsv"
-temp_file="temp_$output_file"
-
-# 鉴别输入文件
+# 根据文件名赋予变量
 for arg in "$@"
 do
     if [[ "$arg" == *"homicide"* ]]; then
         homicide_file="$arg"
-    elif [[ "$arg" == *"life-satisfaction-vs-life-expectancy"* ]]; then
+    elif [[ "$arg" == *"life-expectancy"* ]]; then
         life_expectancy_file="$arg"
     elif [[ "$arg" == *"gdp-vs-happiness"* ]]; then
         happiness_file="$arg"
     fi
 done
 
-# 清理输入文件中的潜在格式问题
-awk -F'\t' -v OFS='\t' '{
-    print;
-}' "$happiness_file" > cleaned_gdp_vs_happiness.tsv
+# 检查文件是否为制表符分隔的格式，并检查是否错误地传入了CSV文件
+for file in "$happiness_file" "$life_expectancy_file" "$homicide_file"; do
+    if ! head -n 1 "$file" | grep -qP '\t'; then
+        if head -n 1 "$file" | grep -qP ','; then
+            echo "Error: $file is a CSV file, not a TSV file." >&2
+        else
+            echo "Error: $file is not a tab-separated values file." >&2
+        fi
+        exit 2
+    fi
+done
 
-# 处理life_expectancy.tsv和homicide-rate-unodc.tsv文件
-awk -F'\t' -v OFS='\t' 'NR > 1 && $3 >= 2011 && $3 <= 2021 {
-    gsub(/\r/, ""); gsub(/\t+/, "\t");
-    if ($4 !~ /^[0-9]+(\.[0-9]+)?$/) $4 = "";   # 如果不是整数或者小数，则设置为空
+# 清理输入文件中的潜在格式问题
+awk -F'\t' -v OFS='\t' '{ print; }' "$happiness_file" > cleaned_gdp_vs_happiness.tsv
+
+# 处理 life_expectancy.tsv 和 homicide-rate-unodc.tsv 文件
+awk -F'\t' -v OFS='\t' 'NR > 1 && $3 >= -11000 && $3 <= 2023 {
+    gsub(/\r/, ""); 
+    # gsub(/\t+/, "\t");
+    if ($4 !~ /^[0-9]+(\.[0-9]+)?$/) $4 = "";  # 如果不是整数或者小数，则设置为空
     print $2, $3, $4;
 }' "$life_expectancy_file" > life_expectancy.map
-awk -F'\t' -v OFS='\t' 'NR > 1 && $3 >= 2011 && $3 <= 2021 {
-    gsub(/\r/, ""); gsub(/\t+/, "\t");
+
+awk -F'\t' -v OFS='\t' 'NR > 1 && $3 >= -11000 && $3 <= 2023 {
+    gsub(/\r/, ""); 
+    # gsub(/\t+/, "\t");将连续的制表符合并为一个
     if ($4 !~ /^[0-9]+\.?[0-9]*$/) $4 = "";  # 如果不是小数，则设置为空
     print $2, $3, $4;
 }' "$homicide_file" > homicide_rate.map
 
-# 输出表头到输出文件
-echo -e "Entity\tCode\tYear\tGDP per capita\tPopulation\tHomicide Rate\tLife Expectancy\tCantril Ladder score" > "$output_file"
+# 打印表头到标准输出
+echo -e "Entity\tCode\tYear\tGDP per capita\tPopulation\tHomicide Rate\tLife Expectancy\tCantril Ladder score"
 
-# 重新合并数据，并将数据写入临时文件
+# 重新合并数据并直接输出到标准输出
 awk -F'\t' -v OFS='\t' '
     BEGIN {
         while ((getline < "life_expectancy.map") > 0) {
-            life_exp[$1 FS $2] = $3;  # Life expectancy数据
+            life_exp[$1 FS $2] = $3;
         }
         while ((getline < "homicide_rate.map") > 0) {
-            homicide[$1 FS $2] = $3;  # Homicide rate数据
+            homicide[$1 FS $2] = $3;
         }
     }
-    FNR > 1 && $2 != "" && $3 >= 2011 && $3 <= 2021 {
-        key = $2 FS $3;
-        # 输出数据，根据新的列顺序
-        print $1, $2, $3, $5, $6, (key in homicide ? homicide[key] : ""), (key in life_exp ? life_exp[key] : ""), $4;
-    }
-' cleaned_gdp_vs_happiness.tsv > "$temp_file"
+    FNR > 1 && $2 != "" && $3 >= -11000 && $3 <= 2023 {
+        # # ori
+        # key = $2 FS $3;
+        # print $1, $2, $3, $5, $6, (key in homicide ? homicide[key] : ""), (key in life_exp ? life_exp[key] : ""), $4;
 
-# 排序数据并追加到输出文件
-sort -k1,1 -k3,3n "$temp_file" >> "$output_file"
+
+        # now
+        key = $2 FS $3;
+        gdp = $5; pop = $6; cantril = $4;
+        homicide_rate = (key in homicide ? homicide[key] : "");
+        life_expectancy = (key in life_exp ? life_exp[key] : "");
+        
+        output = $1 OFS $2 OFS $3 OFS gdp OFS pop OFS homicide_rate OFS life_expectancy OFS cantril;
+
+        # 检查关键列是否为空
+        if (gdp == "" || pop == "" || (homicide_rate == "" && key in homicide) || (life_expectancy == "" && key in life_exp)) {
+            print "correct should have 8 cells,Incomplete data is:", output > "/dev/stderr";
+        } else {
+            print output;  # 只有当所有关键字段都不为空时才输出
+        }
+
+
+
+        # 2 version
+        # key = $2 FS $3;
+        # gdp = $5; pop = $6; cantril = $4;
+        # homicide_rate = (key in homicide ? homicide[key] : "");
+        # life_expectancy = (key in life_exp ? life_exp[key] : "");
+        
+        # output = $1 OFS $2 OFS $3 OFS gdp OFS pop OFS homicide_rate OFS life_expectancy OFS cantril;
+        
+        # # 检查输出行的列数
+        # if (split(output, a, OFS) != 8) {
+        #     print "Incorrect number of fields in line:", output > "/dev/stderr";
+        # } else {
+        #     print output;
+        # }
+    }
+' cleaned_gdp_vs_happiness.tsv | sort -k1,1 -k3,3n
 
 # 清理临时文件
-rm life_expectancy.map homicide_rate.map cleaned_gdp_vs_happiness.tsv "$temp_file"
-
-
-# <Entity> <Code> <Year> <GDP per capita> <Population> <Homicide Rate> <Life Expectancy> <Cantril Ladder score>
-# Entity	Code	Year	Cantril ladder score	GDP per capita, PPP (constant 2017 international $)	Population (historical estimates)	Life Expectancy	Homicide Rate
+rm life_expectancy.map homicide_rate.map cleaned_gdp_vs_happiness.tsv
