@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-# 验证参数数量是否正确
+# here I check the Validate the number of arguments        验证参数数量是否正确
 if [ $# -ne 3 ]; then
     echo "Usage: $0 gdp-vs-happiness.tsv life_expectancy.tsv homicide-rate-unodc.tsv"
     exit 1
 fi
 
-# 根据文件名赋予变量
+# here I  give the variables based on fileName   in this way   I can change the order of input  I use *       根据文件名赋予变量
 for arg in "$@"
 do
     if [[ "$arg" == *"homicide"* ]]; then
@@ -18,7 +18,8 @@ do
     fi
 done
 
-# 检查文件是否为制表符分隔的格式，并检查是否错误地传入了CSV文件
+# Check if the files are tab-separated or CSV files
+# in this part I check it is tsv csv or other type file      检查文件是否为制表符分隔的格式，并检查是否错误地传入了CSV文件
 for file in "$happiness_file" "$life_expectancy_file" "$homicide_file"; do
     if ! head -n 1 "$file" | grep -qP '\t'; then
         if head -n 1 "$file" | grep -qP ','; then
@@ -30,30 +31,33 @@ for file in "$happiness_file" "$life_expectancy_file" "$homicide_file"; do
     fi
 done
 
-# 清理输入文件中的潜在格式问题
+# here I set input and output and get a new file  the aim is to clean potential format issues in input files    清理输入文件中的潜在格式问题
 awk -F'\t' -v OFS='\t' '{ print; }' "$happiness_file" > cleaned_gdp_vs_happiness.tsv
 
-# 处理 life_expectancy.tsv 和 homicide-rate-unodc.tsv 文件
-awk -F'\t' -v OFS='\t' 'NR > 1 && $3 >= -11000 && $3 <= 2023 {
+
+# Process 2 tsv     they are life_expectancy.tsv and homicide-rate-unodc.tsv files      处理 life_expectancy.tsv 和 homicide-rate-unodc.tsv 文件
+#  set the year 2011 and 2021  this is requirement       do not merge into one cells   $4 is life the num is int or float
+awk -F'\t' -v OFS='\t' 'NR > 1 && $3 >= 2011 && $3 <= 2021 {
     gsub(/\r/, ""); 
-    # gsub(/\t+/, "\t");
-    if ($4 !~ /^[0-9]+(\.[0-9]+)?$/) $4 = "";  # 如果不是整数或者小数，则设置为空
+    if ($4 !~ /^[0-9]+(\.[0-9]+)?$/) $4 = "";  # not  integer or decimal, set empty  如果不是整数或者小数，则设置为空
     print $2, $3, $4;
 }' "$life_expectancy_file" > life_expectancy.map
-
-awk -F'\t' -v OFS='\t' 'NR > 1 && $3 >= -11000 && $3 <= 2023 {
-    gsub(/\r/, ""); 
-    # gsub(/\t+/, "\t");将连续的制表符合并为一个
-    if ($4 !~ /^[0-9]+\.?[0-9]*$/) $4 = "";  # 如果不是小数，则设置为空
+# $4 is life the num is float   
+awk -F'\t' -v OFS='\t' 'NR > 1 && $3 >= 2011 && $3 <= 2021 {
+    gsub(/\r/, "");    
+    # delete enter
+    if ($4 !~ /^[0-9]+\.?[0-9]*$/) $4 = "";  #  not  decimal, set empty   如果不是小数，则设置为空
     print $2, $3, $4;
 }' "$homicide_file" > homicide_rate.map
 
-# 打印表头到标准输出
+
+# this is to print header to standard output   first line       打印表头到标准输出
 echo -e "Entity\tCode\tYear\tGDP per capita\tPopulation\tHomicide Rate\tLife Expectancy\tCantril Ladder score"
 
-# 重新合并数据并直接输出到标准输出
+# remerge the data and output directly to standard output     >0  means it is correct      重新合并数据并直接输出到标准输出
 awk -F'\t' -v OFS='\t' '
     BEGIN {
+        # get the data from map and then >0   combine the key
         while ((getline < "life_expectancy.map") > 0) {
             life_exp[$1 FS $2] = $3;
         }
@@ -61,12 +65,7 @@ awk -F'\t' -v OFS='\t' '
             homicide[$1 FS $2] = $3;
         }
     }
-    FNR > 1 && $2 != "" && $3 >= -11000 && $3 <= 2023 {
-        # # ori
-        # key = $2 FS $3;
-        # print $1, $2, $3, $5, $6, (key in homicide ? homicide[key] : ""), (key in life_exp ? life_exp[key] : ""), $4;
-
-
+    FNR > 1 && $2 != "" && $3 >= 2011 && $3 <= 2021 {
         # now
         key = $2 FS $3;
         gdp = $5; pop = $6; cantril = $4;
@@ -75,31 +74,15 @@ awk -F'\t' -v OFS='\t' '
         
         output = $1 OFS $2 OFS $3 OFS gdp OFS pop OFS homicide_rate OFS life_expectancy OFS cantril;
 
-        # 检查关键列是否为空
+        # Check if key columns are empty    only get the full data       检查关键列是否为空
         if (gdp == "" || pop == "" || (homicide_rate == "" && key in homicide) || (life_expectancy == "" && key in life_exp)) {
             print "correct should have 8 cells,Incomplete data is:", output > "/dev/stderr";
         } else {
-            print output;  # 只有当所有关键字段都不为空时才输出
+            print output;  # full 8 cells data  只有当所有关键字段都不为空时才输出
         }
-
-
-
-        # 2 version
-        # key = $2 FS $3;
-        # gdp = $5; pop = $6; cantril = $4;
-        # homicide_rate = (key in homicide ? homicide[key] : "");
-        # life_expectancy = (key in life_exp ? life_exp[key] : "");
-        
-        # output = $1 OFS $2 OFS $3 OFS gdp OFS pop OFS homicide_rate OFS life_expectancy OFS cantril;
-        
-        # # 检查输出行的列数
-        # if (split(output, a, OFS) != 8) {
-        #     print "Incorrect number of fields in line:", output > "/dev/stderr";
-        # } else {
-        #     print output;
-        # }
     }
 ' cleaned_gdp_vs_happiness.tsv | sort -k1,1 -k3,3n
+# this is sort by country and year
 
-# 清理临时文件
+# this is end to clean temp files        清理临时文件
 rm life_expectancy.map homicide_rate.map cleaned_gdp_vs_happiness.tsv
