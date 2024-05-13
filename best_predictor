@@ -1,29 +1,30 @@
 #!/usr/bin/env bash
 
-
-# file="${1:-sample2.tsv}"  # 如果没有指定文件，则默认为 sample2.tsv
+# file="${1:-sample2.tsv}"  # if there is no input    如果没有指定文件，则默认为 sample2.tsv
 # file="${1:-enhanced_gdp_vs_happiness.tsv}"  # 如果没有指定文件，则默认为 sample2.tsv
 
 awk -F'\t' '
-function abs(x) { return x < 0 ? -x : x; }  # 定义一个绝对值函数
+function abs(x) { return x < 0 ? -x : x; }  # here I get function to get absolute value     定义一个绝对值函数
 
 BEGIN {
-    # 初始化数据类型和对应的列号
+    # here I Initia data and set column num                初始化数据类型和对应的列号
     types["Homicide Rate"] = 6;
     types["GDP"] = 4;
     types["Population"] = 5;
     types["Life Expectancy"] = 7;
 
-    # 定义输出顺序
+    # here I set output order                   定义输出顺序
     order[1] = "Homicide Rate";
     order[2] = "GDP";
     order[3] = "Population";
     order[4] = "Life Expectancy";
-    max_corr = 0;  # 初始化最大相关系数
+    max_corr = 0;  
+    #  Here I set the maximum correlation coefficient is 0                  初始化最大相关系数
+
 }
 
 {
-    # 只考虑有Cantril得分的行
+    # here I only consider rows that have Cantril scores     make sure these col(4 5 6 7 8) have the num              只考虑有Cantril得分的行
     if ($8 != "" && $4 != "" && $5 != "" && $6 != "" && $7 != "") {
         country = $2;
         cantrilEntries[country]++;
@@ -32,17 +33,18 @@ BEGIN {
 }
 
 END {
-    # 遍历每个国家，检查Cantril得分的数据点是否足够
+    # Iterate all country and check larger than 3 Cantril                遍历每个国家，检查Cantril得分的数据点是否足够
     for (country in cantrilEntries) {
         if (cantrilEntries[country] >= 3) {
-            # 该国家的Cantril得分数据点足够，处理数据
+            # here I get sufficient for Cantril   type is like population GDP etc                 该国家的Cantril得分数据点足够，处理数据
             for (t in types) {
+                # at start   make them all 0
                 sum_x = sum_y = sum_xy = sum_x2 = sum_y2 = n = 0;
                 for (i = 1; i <= cantrilEntries[country]; i++) {
                     split(tempData[country][i], values, " ");
                     x = values[types[t] - 3];
-                    y = values[5];  # Cantril值的索引，确保正确
-                    if (x != "" && y != "") {  # 确保x和y非空
+                    y = values[5];  # Index of Cantril make sure correct          Cantril值的索引 确保正确
+                    if (x != "" && y != "") {  # Ensure x and y are not empty          确保x和y非空
                         sum_x += x;
                         sum_y += y;
                         sum_xy += x * y;
@@ -56,6 +58,7 @@ END {
                     denominator = sqrt((n * sum_x2 - sum_x^2) * (n * sum_y2 - sum_y^2));
                     if (denominator != 0) {
                         correlation = numerator / denominator;
+                        # add all the correlation
                         corrSum[t] += correlation;
                         corrCount[t]++;
                     }
@@ -64,23 +67,22 @@ END {
         }
     }
 
-    # 计算并打印每种类型的平均相关系数
+    # Calculate and print the average correlation for each type     from 1 to 4          计算并打印每种类型的平均相关系数
     for (i = 1; i <= 4; i++) {
         t = order[i];
         if (corrCount[t] > 0) {
             avgCorr = corrSum[t] / corrCount[t];
             printf "Mean correlation of %s with Cantril Ladder is %.3f\n", t, avgCorr;
-            # 检查是否为最大的相关系数
+            # Check if is the maximum correlation          检查是否为最大的相关系数
             if (abs(avgCorr) > abs(max_corr)) {
                 max_corr = avgCorr;
                 max_type = t;
             }
         } else {
-            print "Insufficient data or division by zero error for " t;
+            print "Data is not enough or division by zero" t;
         }
     }
-
-    # 打印出最大的相关系数和对应的类型
+    # Print out the maximum correlation and its corresponding type         打印出最大的相关系数和对应的类型
     printf "Most predictive mean correlation with the Cantril ladder is %s (r = %.3f)\n", max_type, max_corr;
 }'
 
