@@ -76,13 +76,14 @@ awk -F'\t' -v OFS='\t' '
 
         # Check if key columns are empty    only get the full data       检查关键列是否为空
         if (gdp == "" || pop == "" || (homicide_rate == "" && key in homicide) || (life_expectancy == "" && key in life_exp)) {
-            print "correct should have 8 cells,Incomplete data is:", output > "/dev/stderr";
+            print "do not have the same number of cells :", output > "/dev/stderr";
         } else {
-            print output;  # full 8 cells data  只有当所有关键字段都不为空时才输出
+            print output >> "temp_output.tsv";  #  save to temp files   先将输出追加到临时文件
         }
     }
 ' cleaned_gdp_vs_happiness.tsv | sort -k1,1 -k3,3n
 # this is sort by country and year
-
+sort temp_output.tsv > output.tsv
+# rm temp_output.tsv  # remove the tmp file   this is end to clean temp files
 # this is end to clean temp files        清理临时文件
-rm life_expectancy.map homicide_rate.map cleaned_gdp_vs_happiness.tsv
+rm life_expectancy.map homicide_rate.map cleaned_gdp_vs_happiness.tsv temp_output.tsv
