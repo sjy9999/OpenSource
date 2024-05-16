@@ -1,8 +1,33 @@
 #!/usr/bin/env bash
 
-file="${1:-output.tsv}"  # if there is no input  then default is output.tsv     如果没有指定文件，则默认为 sample2.tsv
-# file="${1:-enhanced_gdp_vs_happiness.tsv}"  # 如果没有指定文件，则默认为 sample2.tsv
+# CITS4407 Open Source   assignment 2    best_predictor
+# Name: Junyi Sun
+# Student Number: 24382608
+# Date:2024  May 16th
 
+# this is a good way to show the result    easy for me to debug
+# echo "This is the do not have the same number of cells:"
+# cat
+
+# Note!!!!!!!!!!!!!!!!!!!!!!!!!
+# The end of this section corresponds to the end of the first step. 
+# If you uncomment the comments at the bottom of the first script and change the first script to automatically generate "output.tsv", 
+# then this script will read "output.tsv", achieving complete automation of the program. 
+# In that case, you can comment out the code section below that checks for provided parameters and retrieves the file name.
+
+# # if there is no input  then default is output.tsv     如果没有指定文件，则默认为 output.tsv
+# file="${1:-output.tsv}"  
+
+# to check wheather 检查是否提供了参数
+if [ $# -eq 0 ]; then
+    echo "Usage: $0 <input_file.tsv>"
+    exit 1
+fi
+
+# get the name of the input file 获取文件名
+file="$1"
+
+# this is the start of awk
 awk -F'\t' '
 function abs(x) { return x < 0 ? -x : x; }  # here I get function to get absolute value     定义一个绝对值函数
 
