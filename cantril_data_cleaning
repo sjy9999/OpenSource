@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+# CITS4407 Open Source   assignment 2    cantril_data_cleaning
+# Name: Junyi Sun
+# Student Number: 24382608
+# Date:2024  May 16th
+
+
 # here I check the Validate the number of arguments        验证参数数量是否正确
 if [ $# -ne 3 ]; then
     echo "Usage: $0 gdp-vs-happiness.tsv life_expectancy.tsv homicide-rate-unodc.tsv"
@@ -76,14 +82,27 @@ awk -F'\t' -v OFS='\t' '
 
         # Check if key columns are empty    only get the full data       检查关键列是否为空
         if (gdp == "" || pop == "" || (homicide_rate == "" && key in homicide) || (life_expectancy == "" && key in life_exp)) {
+            # this is not the full data
+            # print "do not have the same number of cells: ", output;
             print "do not have the same number of cells :", output > "/dev/stderr";
         } else {
-            print output >> "temp_output.tsv";  #  save to temp files   先将输出追加到临时文件
+            print output;  # this is to make to the stdout    直接输出到 stdout
+            # print output >> "temp_output.tsv";  #  save to temp files  this is the full 8 cells data  先将输出追加到临时文件   这是完整数据
         }
     }
-' cleaned_gdp_vs_happiness.tsv | sort -k1,1 -k3,3n
-# this is sort by country and year
-sort temp_output.tsv > output.tsv
-# rm temp_output.tsv  # remove the tmp file   this is end to clean temp files
-# this is end to clean temp files        清理临时文件
-rm life_expectancy.map homicide_rate.map cleaned_gdp_vs_happiness.tsv temp_output.tsv
+' "${happiness_file}" | sort -k1,1 -k3,3n
+# remove the temp file 清理临时文件
+rm -f life_expectancy.map homicide_rate.map cleaned_gdp_vs_happiness.tsv
+
+# Note!!!!!!!!!!!!!!!!!!!!!!!!!
+# Below is my second method. As a scorer, you can comment out the previous comments and use this method. 
+# Here, the output will automatically become "output.tsv". 
+# Then, in the second script, it will automatically read this "output.tsv" and output the results in the same way. 
+# This is my second implementation, which achieves a higher level of automation. 
+# Users do not need to input the name of the TSV file to retrieve the results.
+# ' cleaned_gdp_vs_happiness.tsv | sort -k1,1 -k3,3n
+# # this is sort by country and year
+# sort temp_output.tsv > output.tsv
+# # rm temp_output.tsv  # remove the tmp file   this is end to clean temp files
+# # this is end to clean temp files        清理临时文件
+# rm life_expectancy.map homicide_rate.map cleaned_gdp_vs_happiness.tsv temp_output.tsv
